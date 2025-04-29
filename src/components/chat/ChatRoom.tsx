@@ -12,7 +12,7 @@ import {
   updateDoc,
   getDoc,
 } from 'firebase/firestore';
-import { auth, db } from '../../config/firebase';
+import { auth, db, storage } from '../../config/firebase';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   Box, 
@@ -51,6 +51,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import moment from 'moment';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 interface Message {
   id: string;
@@ -108,6 +109,8 @@ const ChatRoom: React.FC = () => {
   const [currentGroupId, setCurrentGroupId] = useState<string | null>(null);
   const [groups, setGroups] = useState<Group[]>([]);
   const [isClearChatDialogOpen, setIsClearChatDialogOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   // Get groupId from query parameters
   const queryParams = new URLSearchParams(location.search);
@@ -514,6 +517,34 @@ const ChatRoom: React.FC = () => {
 
   const handleGroupClick = (groupId: string) => {
     navigate(`/chat?groupId=${groupId}`);
+  };
+
+  const handleClipButtonClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !auth.currentUser) return;
+    setUploading(true);
+    try {
+      const storageRef = ref(storage, `chat_images/${Date.now()}_${file.name}`);
+      await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(storageRef);
+      await addDoc(collection(db, 'messages'), {
+        text: '',
+        imageUrl: url,
+        userId: auth.currentUser.uid,
+        username: auth.currentUser.displayName || 'Anonymous',
+        createdAt: new Date(),
+        groupId: currentGroupId,
+      });
+    } catch (error) {
+      console.error('Error uploading image:', error);
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
   return (
@@ -963,9 +994,16 @@ const ChatRoom: React.FC = () => {
               <IconButton onClick={handleGifButtonClick}>
                 <EmojiEmotionsIcon />
               </IconButton>
-              <IconButton>
+              <IconButton onClick={handleClipButtonClick} disabled={uploading}>
                 <AttachFileIcon />
               </IconButton>
+              <input
+                type="file"
+                accept="image/*"
+                style={{ display: 'none' }}
+                ref={fileInputRef}
+                onChange={handleFileChange}
+              />
               <TextField
                 fullWidth
                 variant="outlined"
@@ -999,6 +1037,12 @@ const ChatRoom: React.FC = () => {
               </IconButton>
             </Box>
           </form>
+          {uploading && (
+            <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
+              <CircularProgress size={20} sx={{ mr: 1 }} />
+              <Typography variant="body2">Uploading image...</Typography>
+            </Box>
+          )}
         </Paper>
 
         {/* GIF Popover */}

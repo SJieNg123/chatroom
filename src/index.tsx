@@ -2,19 +2,18 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App';
-import app from './config/firebase';
-import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
-import { getStorage } from 'firebase/storage';
-import { getDatabase } from 'firebase/database';
-import { getAnalytics } from 'firebase/analytics';
 
-// Initialize Firebase services
-const auth = getAuth(app);
-const db = getFirestore(app);
-const storage = getStorage(app);
-const rtdb = getDatabase(app);
-const analytics = getAnalytics(app);
+// Register service worker for notifications
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', async () => {
+    try {
+      const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+      console.log('Service Worker registered:', registration);
+    } catch (err) {
+      console.log('Service Worker registration failed:', err);
+    }
+  });
+}
 
 // Error boundary component
 class ErrorBoundary extends React.Component<
